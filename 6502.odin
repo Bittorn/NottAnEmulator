@@ -143,7 +143,33 @@ clock_cpu :: proc() {
 		the next one is ready to be executed. */
 	
 	if (cpu_cycles == 0) {
-		// do something
+		/* Read next instruction byte. This 8-bit value is used to index
+			the translation table to get the relevant information about
+			how to implement the instruction */
+		cpu_opcode = read(cpu_pc)
+
+		// Always set the unused status flag bit to 1
+		set_flag(FLAGS6502.U, true);
+		
+		// Increment program counter, we read the opcode byte
+		cpu_pc = cpu_pc + 1
+
+		// Get Starting number of cycles
+		cpu_cycles = lookup[cpu_opcode].cycles;
+
+		// Perform fetch of intermmediate data using the
+		// required addressing mode
+		additional_cycle1: u8 = *lookup[cpu_opcode].addrmode();
+
+		// Perform operation
+		additional_cycle2: u8 = *lookup[cpu_opcode].operate();
+
+		// The addressmode and opcode may have altered the number
+		// of cycles this instruction requires before its completed
+		cpu_cycles += (additional_cycle1 & additional_cycle2);
+
+		// Always set the unused status flag bit to 1
+		set_flag(FLAGS6502.U, true);
 	}
 }
 

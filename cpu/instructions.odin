@@ -214,4 +214,40 @@ IZY :: proc() -> u8 {
 	}
 }
 
+fetch :: proc() -> u8 {
+	if (!(lookup[opcode].addrmode == IMP)) {
+		fetched = read(addr_abs)
+	}
+	return fetched
+}
+
 // =-=-=-=-=	CPU INSTRUCTIONS	=-=-=-=-=
+
+// TODO: add documentation for instructions
+
+ADC :: proc() -> u8 {
+	// Grab the needed data
+	fetch()
+
+	// Add is performed in 16-bit domain for emulation to capture any
+	// carry bit, which will exist in bit 8 of the 16-bit word
+	temp = u16(a + fetched + get_flag(FLAGS.C))
+
+	// Carry flag exists in the high bit 0
+	set_flag(FLAGS.C, temp > 255)
+
+	// Set Zero flag if result is 0
+	set_flag(FLAGS.Z, (temp & 0x00FF) == 0)
+
+	// The signed Overflow flag is set based on everything above
+	set_flag(FLAGS.V, ~(u16((a ^ fetched) & (a ^ temp))) & 0x0080) // something wrong here
+
+	// Set Negative flag based on most significant bit of the result
+	set_flag(FLAGS.N, temp & 0x80) // TODO: check if this works
+
+	// Load result into accumulator
+	a = u8(temp & 0x00FF)
+
+	// This instruction has the potential to require an additional clock cycle
+	return 1
+}

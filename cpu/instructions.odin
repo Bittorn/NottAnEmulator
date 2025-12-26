@@ -34,7 +34,7 @@ cpu_lookup := [256]INSTRUCTION{
 	there are 256 pages, each containing 256 bytes.
 
 	Several addressing modes have the potential to require an additional clock
-	cycle if they cross a page boundary. This is combined with several instructions
+	cycle if they cross a page boundary. This is combined with other instructions
 	that enable this additional clock cycle. So each addressing function returns
 	a flag saying it has potential, as does each instruction. If both instruction
 	and address function return 1, then an additional clock cycle is required. */
@@ -62,7 +62,7 @@ IMM :: proc() -> u8 {
 	a location in the first 0xFF bytes of address range. Clearly this only
 	requires one byte instead of the usual two */
 ZP0 :: proc() -> u8 {
-	addr_abs = read(pc)
+	addr_abs = u16(read(pc))
 	pc = pc + 1
 	addr_abs &= 0x00FF
 	return 0
@@ -73,7 +73,7 @@ ZP0 :: proc() -> u8 {
 	single byte address. This is useful for iterating through ranges within
 	the first page */
 ZPX :: proc() -> u8 {
-	addr_abs = read(pc) + x
+	addr_abs = u16(read(pc) + x)
 	pc = pc + 1
 	addr_abs &= 0x00FF
 	return 0
@@ -83,7 +83,7 @@ ZPX :: proc() -> u8 {
 	Same as ZPX, but the contents of register Y is added to the supplied
 	single byte address */
 ZPY :: proc() -> u8 {
-	addr_abs = read(pc) + y
+	addr_abs = u16(read(pc) + y)
 	pc = pc + 1
 	addr_abs &= 0x00FF
 	return 0
@@ -94,12 +94,124 @@ ZPY :: proc() -> u8 {
 	-128 to +127 of the branch instruction. This means programmers
 	cannot branch directly to any address in the addressable range */
 REL :: proc() -> u8 {
-	addr_rel = read(pc)
+	addr_rel = u16(read(pc))
 	pc = pc + 1
-	if (addr_rel & 0x80) {
+	if ((addr_rel & 0x80) > 0xFF00) { // TODO: confirm this works
 		addr_rel |= 0xFF00
 	}
 	return 0
+}
+
+/* Address Mode: Absolute
+	A full 16-bit address is loaded and used */
+ABS :: proc() -> u8 {
+	lo: u16 = u16(read(pc))
+	pc = pc + 1
+	hi: u16 = u16(read(pc))
+	pc = pc + 1
+
+	addr_abs = (hi << 8) | lo
+
+	return 0
+}
+
+/* Address Mode: Absolute with X Offset
+	Same as ABS, but the X register is added to the supplied two byte address.
+	If the resulting address changes the page, an additional clock
+	cycle is required */
+ABX :: proc() -> u8 {
+	lo: u16 = u16(read(pc))
+	pc = pc + 1
+	hi: u16 = u16(read(pc))
+	pc = pc + 1
+
+	addr_abs = (hi << 8) | lo
+	addr_abs += u16(x)
+
+	if ((addr_abs & 0xFF00) != (hi << 8)) {
+		return 1
+	} else {
+		return 0
+	}
+}
+
+/* Address Mode: Absolute with Y Offset
+	Same as ABX, but the Y register is added to the supplied two byte address */
+ABY :: proc() -> u8 {
+	lo: u16 = u16(read(pc))
+	pc = pc + 1
+	hi: u16 = u16(read(pc))
+	pc = pc + 1
+
+	addr_abs = (hi << 8) | lo
+	addr_abs += u16(y)
+
+	if ((addr_abs & 0xFF00) != (hi << 8)) {
+		return 1
+	} else {
+		return 0
+	}
+}
+
+/* Address Mode: Indirect
+	The supplied 16-bit address is read to get the actual 16-bit address.
+	This instruction is unusual in that it has a bug in the hardware!
+	If the low byte of the supplied address is 0xFF, then we need to
+	cross a page boundary to read the high byte of the actual address.
+	Instead, on the 6502 as designed, it wraps back around in the same page,
+	producing an invalid actual address */
+IND :: proc() -> u8 {
+	ptr_lo: u16 = u16(read(pc))
+	pc = pc + 1
+	ptr_hi: u16 = u16(read(pc))
+	pc = pc + 1
+
+	ptr: u16 = (ptr_hi << 8) | ptr_lo
+
+	if (ptr_lo == 0x00FF) { // Simulate page boundary bug
+		addr_abs = u16((read(ptr & 0xFF00) << 8) | read(ptr + 0))
+	} else { // Behave normalls
+		addr_abs = u16((read(ptr + 1) << 8) | read(ptr + 0))
+	}
+
+	return 0
+}
+
+/* Address Mode: Indirect X
+	The supplied 8-bit address is offset by register X to index a location
+	in page 0x00. The actual 16-bit address is read from this location */
+IZX :: proc() -> u8 {
+	t: u16 = u16(read(pc))
+	pc = pc + 1
+
+	lo: u16 = u16(read(t + u16(x) & 0x00FF))
+	hi: u16 = u16(read(t + u16(x + 1) & 0x00FF))
+
+	addr_abs = (hi << 8) | lo
+
+	return 0
+}
+
+/* Address Mode: Indirect Y
+	The supplied 8-bit address indexes a location in page 0x00. From here the
+	actual 16-bit address is read, and the contents of register Y is added
+	as an offset. If the offset causes a page change, an additional clock cycle
+	is required */
+IZY :: proc() -> u8 {
+	t: u16 = u16(read(pc))
+	pc = pc + 1
+
+	lo: u16 = u16(read(t & 0x00FF))
+	hi: u16 = u16(read((t + 1) & 0x00FF))
+
+	addr_abs = (hi << 8) | lo
+	addr_abs += u16(y)
+
+	if ((addr_abs & 0xFF00) != (hi << 8)) {
+		return 1
+	} else {
+		return 0
+	}
 }
 
 // =-=-=-=-=	CPU INSTRUCTIONS	=-=-=-=-=

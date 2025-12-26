@@ -223,8 +223,9 @@ fetch :: proc() -> u8 {
 
 // =-=-=-=-=	CPU INSTRUCTIONS	=-=-=-=-=
 
-// TODO: add documentation for instructions
+// TODO: add documentation for each instruction
 
+// Instruction: Add with Carry In
 ADC :: proc() -> u8 {
 	// Grab the needed data
 	fetch()

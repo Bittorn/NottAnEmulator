@@ -1,0 +1,53 @@
+{
+    // See https://go.microsoft.com/fwlink/?LinkId=733558
+    // for the documentation about the tasks.json format
+    "version": "2.0.0",
+    "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+    },
+    "problemMatcher": {
+        "owner": "odin",
+        "source": "Odin",
+        "fileLocation": "absolute",
+        "pattern": {
+          "regexp": "^(.*?)(\\((\\d+):(\\d+)\\))\\s+(Syntax\\s+)?(Error|Warning):\\s+(.+)$",
+          "file": 1,
+          "line": 3,
+          "column": 4,
+          "severity": 6,
+          "message": 7
+        }
+    },
+    "tasks": [
+        {
+            "label": "Build",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "type": "process",
+            "command": "odin",
+            "problemMatcher": "$odin",
+            "args": [
+                "build",
+                "${workspaceFolder}",
+                "-vet",
+                "-strict-style",
+                "-show-timings"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            }
+        },
+        {
+            "label": "Launch",
+            "type": "process",
+            "dependsOn": "Build",
+            "command": "${workspaceFolder}/${fileDirnameBasename}",
+            "options": {
+                "cwd": "${workspaceFolder}"
+            }
+        }
+    ]
+}
